@@ -3,6 +3,7 @@ import argparse
 import textwrap
 import re
 from lxml import etree
+from lxml import builder
 
 import sys
 
@@ -48,9 +49,21 @@ def convert_dataset(xml_file, images):
         print('{} not found'.format(xml_file))
     else:
         root = xml.getroot()
+        if root.tag.lower() == "annotations":
+            page = etree.Element("annotations")
+            doc = etree.ElementTree(page)
+            page.append(root.find('meta'))
+            # pageElement = etree.SubElement(page, root.find('meta'))
+            for image in root.iter("image"):
+                print(image.attrib["name"])
+                for box in image.iter("box"):
+                    if(box.attrib["label"]=="car"):
+                        print(box.attrib)
+            doc.write('output.xml', xml_declaration=True, encoding='utf-8')
 
 
-# Press the green button in the gutter to run the script.
+
+        # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     args = parse_args()
 
