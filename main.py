@@ -39,6 +39,34 @@ def parse_classes(classes_file):
         classes = [subrow for row in fh for subrow in re.split(split_row_pattern, row.strip('\n'))]
     return classes
 
+def _extract_from_image(image_file, boundboxes_in_frame=[], frame_number=None, dirname='', video_filename=''):
+    """Extract objects from frame using Pillow"""
+    if not (os.path.exists(image_file) and os.path.isfile(image_file)):
+        print("FileNotFoundError: {}".format(image_file))
+    else:
+        with Image.open(image_file) as img:
+            for bbox in boundboxes_in_frame:
+                output_dir = os.path.join(self.__output, bbox.className)
+                if not (os.path.exists(output_dir) and os.path.isdir(output_dir)):
+                    try:
+                        os.mkdir(output_dir)
+                    except FileExistsError:
+                        pass
+                try:
+                    fragment = img.crop((bbox.x, bbox.y, bbox.width + bbox.x, bbox.height + bbox.y))
+                    if not dirname:
+                        dirname = os.path.basename(os.path.dirname(image_file if not video_filename else video_filename))
+                    if video_filename and frame_number is not None:
+                        image_name = "{}_{}".format(os.path.splitext(os.path.basename(video_filename))[0], frame_number)
+                    else:
+                        image_name = os.path.splitext(os.path.basename(image_file))[0]
+
+                    FragmentFileName = os.path.join(output_dir, "{}_{}_{}_{}.png".format(dirname, image_name, bbox.x, bbox.y))
+                    fragment.save(FragmentFileName)
+                except SystemError:
+                    print('-------------\nBoundBox position error in image: {}\nImage size: {}\n{}\n{} - will be deleted'.format(image_file, img.size, bbox, FragmentFileName))
+                    os.remove(FragmentFileName)
+
 def convert_dataset(xml_file, images):
     try:
         xml = etree.parse(xml_file)
