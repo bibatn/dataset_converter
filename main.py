@@ -3,7 +3,11 @@ import argparse
 import textwrap
 import re
 from lxml import etree
+from PIL import Image
+import collections
 from lxml import builder
+
+BoundBox = collections.namedtuple('BoundBox', ['className', 'x', 'y', 'width', 'height'])
 
 import sys
 
@@ -39,19 +43,13 @@ def parse_classes(classes_file):
         classes = [subrow for row in fh for subrow in re.split(split_row_pattern, row.strip('\n'))]
     return classes
 
-def _extract_from_image(image_file, boundboxes_in_frame=[], frame_number=None, dirname='', video_filename=''):
+def extract_from_image(image_file, output_dir, boundboxes_in_frame=[], frame_number=None, dirname='', video_filename=''):
     """Extract objects from frame using Pillow"""
     if not (os.path.exists(image_file) and os.path.isfile(image_file)):
         print("FileNotFoundError: {}".format(image_file))
     else:
         with Image.open(image_file) as img:
             for bbox in boundboxes_in_frame:
-                output_dir = os.path.join(self.__output, bbox.className)
-                if not (os.path.exists(output_dir) and os.path.isdir(output_dir)):
-                    try:
-                        os.mkdir(output_dir)
-                    except FileExistsError:
-                        pass
                 try:
                     fragment = img.crop((bbox.x, bbox.y, bbox.width + bbox.x, bbox.height + bbox.y))
                     if not dirname:
@@ -68,6 +66,17 @@ def _extract_from_image(image_file, boundboxes_in_frame=[], frame_number=None, d
                     os.remove(FragmentFileName)
 
 def convert_dataset(xml_file, images):
+    output_dir = os.path.join(images, '..', '..', 'converted_dataset')
+    try:
+        os.mkdir(output_dir)
+    except FileExistsError:
+        pass
+
+    outpud_images_dir = output_dir + "/images"
+    try:
+        os.mkdir(outpud_images_dir)
+    except FileExistsError:
+        pass
     try:
         xml = etree.parse(xml_file)
     except etree.ParseError as err:
@@ -81,13 +90,29 @@ def convert_dataset(xml_file, images):
             page = etree.Element("annotations")
             doc = etree.ElementTree(page)
             page.append(root.find('meta'))
+            objects = []
+            boundboxes_in_frame = []
             # pageElement = etree.SubElement(page, root.find('meta'))
             for image in root.iter("image"):
                 print(image.attrib["name"])
                 for box in image.iter("box"):
                     if(box.attrib["label"]=="car"):
                         print(box.attrib)
-            doc.write('output.xml', xml_declaration=True, encoding='utf-8')
+                        try:
+                            x0 = int(float(box.attrib["xtl"]))
+                            y0 = int(float(box.attrib["ytl"]))
+                            xN = int(float(box.attrib["xbr"]))
+                            yN = int(float(box.attrib["ybr"]))
+                        except ValueError as err:
+                            print(err)
+                            sys.exit(1)
+                        else:
+                            boundboxes_in_frame.append(BoundBox(className=box.attrib["label"], x=x0, y=y0, width=(xN - x0), height=(yN - y0)))
+
+                image_file = images + "/" + image.attrib["name"]
+                extract_from_image(image_file, outpud_images_dir, boundboxes_in_frame)
+
+            doc.write(output_dir + '/output.xml', xml_declaration=True, encoding='utf-8')
 
 
 
